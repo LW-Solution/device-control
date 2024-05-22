@@ -4,15 +4,6 @@
 
 String uid;
 
-typedef struct_atribute_((packed)){
-  int16_t temperatura;
-  int16_t umidade;
-  int16_t vel_vento;
-  int16_t dir_vento;
-} payload_t
-
-payload_t pay;
-
 char *ssid = "nao tem wifi";
 char *pwd = "40028922";
 
@@ -24,7 +15,14 @@ int daylight = 0;
 time_t now;
 struct tm timeinfo;
 
+typedef struct __attribute__((packed)){
+  int16_t temperatura;
+  int16_t umidade;
+  int16_t vel_vento;
+  int16_t dir_vento;
+} payload_t;
 
+payload_t pay;
 
 WiFiClient wclient;
 PubSubClient mqttClient(wclient);
@@ -98,12 +96,12 @@ void loop() {
     connectMqtt();  
   }
 
-  pay.temperatura = random(20, 35);
-  pay.umidade = random(10, 90);
-  pay.vel_vento = random(0, 100);
-  pay.dir_vento = random(0, 359);
+    pay.temperatura = random(20, 35);
+    pay.umidade = random(10, 90);
+    pay.vel_vento = random(0, 100);
+    pay.dir_vento = random(0, 359);
 
-  String json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
+    String json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
     + ", \"umidade\":" + String(pay.umidade)
     + ", \"vel_vento\":" + String(pay.vel_vento)
     + ", \"dir_vento\":" + String(pay.dir_vento)
@@ -113,6 +111,8 @@ void loop() {
   {
     sincronizaTempo();
     Serial.println("Enviar dados pelo MQTT");
-    Serial.println(json)
-    mqttClient.publish("fatec/lw/dados/",json);
+    Serial.println(json);
+    Serial.println(json.c_str());
+    mqttClient.publish("fatec/lw/dados/", json.c_str());
   }
+}
