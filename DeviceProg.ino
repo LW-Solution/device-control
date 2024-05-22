@@ -3,6 +3,7 @@
 #include "time.h"
 
 String uid;
+String json;
 
 char *ssid = "nao tem wifi";
 char *pwd = "40028922";
@@ -20,8 +21,15 @@ TaskHandle_t task2;
 
 SemaphoreHandle_t mutex;
 
-float temp = 0.0;
-float umi = 0.0;
+typedef struct __attribute__((packed)){
+  int16_t temperatura;
+  int16_t umidade;
+  int16_t vel_vento;
+  int16_t dir_vento;
+} payload_t;
+
+payload_t pay;
+
 
 void minhaTask1(void *pvParameters)
 {
@@ -29,8 +37,19 @@ void minhaTask1(void *pvParameters)
   while(true){
     //regiao crítica
     xSemaphoreTake(mutex, portMAX_DELAY);
-    temp = temp +0.24;
-    umi = umi + 0.51;
+  
+  
+    pay.temperatura = random(20, 35);
+    pay.umidade = random(10, 90);
+    pay.vel_vento = random(0, 100);
+    pay.dir_vento = random(0, 359);
+
+    json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
+    + ", \"umidade\":" + String(pay.umidade)
+    + ", \"vel_vento\":" + String(pay.vel_vento)
+    + ", \"dir_vento\":" + String(pay.dir_vento)
+    + "}";
+
     xSemaphoreGive(mutex);
     delay(1300);
   }
@@ -41,21 +60,23 @@ void minhaTask2(void *pvParameters)
   Serial.println("Comecou a Task2");
   while(true){
     xSemaphoreTake(mutex, portMAX_DELAY);
-    temp = temp - 0.09;
-    umi = umi - 0.23;
+    
+  
+    pay.temperatura = random(20, 35);
+    pay.umidade = random(10, 90);
+    pay.vel_vento = random(0, 100);
+    pay.dir_vento = random(0, 359);
+
+    json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
+    + ", \"umidade\":" + String(pay.umidade)
+    + ", \"vel_vento\":" + String(pay.vel_vento)
+    + ", \"dir_vento\":" + String(pay.dir_vento)
+    + "}";
+
     xSemaphoreGive(mutex);
     delay(800);
   }
 }
-
-typedef struct __attribute__((packed)){
-  int16_t temperatura;
-  int16_t umidade;
-  int16_t vel_vento;
-  int16_t dir_vento;
-} payload_t;
-
-payload_t pay;
 
 WiFiClient wclient;
 PubSubClient mqttClient(wclient);
@@ -157,30 +178,29 @@ void loop() {
     connectMqtt();  
   }
 
-    pay.temperatura = random(20, 35);
-    pay.umidade = random(10, 90);
-    pay.vel_vento = random(0, 100);
-    pay.dir_vento = random(0, 359);
-
-    String json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
-    + ", \"umidade\":" + String(pay.umidade)
-    + ", \"vel_vento\":" + String(pay.vel_vento)
-    + ", \"dir_vento\":" + String(pay.dir_vento)
-    + "}";
   
   if ((time(&now) % 120) == 0)
   {
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    Serial.print("Temperatura ");
+    Serial.println(pay.temperatura);
+    Serial.print("Umidade ");
+    Serial.println(pay.umidade);
+    Serial.print("Velocidade do vento ");
+    Serial.println(pay.vel_vento);
+    Serial.print("Direcao do vento ");
+    Serial.println(pay.dir_vento);
+    xSemaphoreGive(mutex);
+    
+
+
+    
     sincronizaTempo();
     Serial.println("Enviar dados pelo MQTT");
     Serial.println(json);
     Serial.println(json.c_str());
     mqttClient.publish("fatec/lw/dados/", json.c_str());
+    delay(1000);
   }
-  xSemaphoreTake(mutex, portMAX_DELAY);
-  Serial.print("Temperatura ");
-  Serial.println(temp);
-  Serial.print("Umidade ");
-  Serial.println(umi);
-  xSemaphoreGive(mutex);
-  delay(1000);
+ 
 }
