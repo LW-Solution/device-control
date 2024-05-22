@@ -5,8 +5,8 @@
 String uid;
 String json;
 
-char *ssid = "nao tem wifi";
-char *pwd = "40028922";
+char *ssid = "redeplaca";
+char *pwd = "senhaplaca";
 
 char *mqttServer = "test.mosquitto.org";
 
@@ -26,6 +26,7 @@ typedef struct __attribute__((packed)){
   int16_t umidade;
   int16_t vel_vento;
   int16_t dir_vento;
+  String station_description;
 } payload_t;
 
 payload_t pay;
@@ -43,12 +44,14 @@ void minhaTask1(void *pvParameters)
     pay.umidade = random(10, 90);
     pay.vel_vento = random(0, 100);
     pay.dir_vento = random(0, 359);
+    pay.station_description = "Sao Jose dos Campos";
 
-    json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
-    + ", \"umidade\":" + String(pay.umidade)
-    + ", \"vel_vento\":" + String(pay.vel_vento)
-    + ", \"dir_vento\":" + String(pay.dir_vento)
-    + "}";
+    json = "{\"uuid\":" + uid + ",\"station_description\":" + String(pay.station_description)
+    + ",\"unix\":" + String(time(&now))
+    + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
+    + ",\"Umidade\":" + String(pay.umidade)
+    + ",\"Vento\":" + String(pay.vel_vento)
+    + "}}";
 
     xSemaphoreGive(mutex);
     delay(1300);
@@ -66,12 +69,14 @@ void minhaTask2(void *pvParameters)
     pay.umidade = random(10, 90);
     pay.vel_vento = random(0, 100);
     pay.dir_vento = random(0, 359);
+    pay.station_description = "Sao Jose dos Campos";
 
-    json = "{\"uid\":"+ uid + " , \"temperatura\":" + String(pay.temperatura)
-    + ", \"umidade\":" + String(pay.umidade)
-    + ", \"vel_vento\":" + String(pay.vel_vento)
-    + ", \"dir_vento\":" + String(pay.dir_vento)
-    + "}";
+    json = "{\"uuid\":" + uid + ",\"station_description\":" + String(pay.station_description)
+    + ",\"unix\":" + String(time(&now))
+    + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
+    + ",\"Umidade\":" + String(pay.umidade)
+    + ",\"Vento\":" + String(pay.vel_vento)
+    + "}}";
 
     xSemaphoreGive(mutex);
     delay(800);
@@ -179,7 +184,7 @@ void loop() {
   }
 
   
-  if ((time(&now) % 120) == 0)
+  if ((time(&now) % 60) == 0)
   {
     xSemaphoreTake(mutex, portMAX_DELAY);
     Serial.print("Temperatura ");
