@@ -233,14 +233,15 @@ void loop() {
   {
     connectMqtt();  
   }
+  
 
-    json = "{\"uuid\":" + uid + ",\"station_description\":" + String(pay.station_description)
-    + ",\"unix\":" + String(time(&now))
+    json = "{\"uuid\":\"" + uid
+    + "\",\"unix\":" + String(time(&now))
     + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
     + ",\"Umidade\":" + String(pay.umidade)
     + ",\"Vento\":" + String(pay.vel_vento)
     + "}}";
-
+  
 
     /*
     json = "{'uuid':" + uid + ",'station_description':" + String(pay.station_description)
@@ -251,8 +252,9 @@ void loop() {
     + "}}";
     */
     
+    
   
-  if ((time(&now) % 60) == 0)
+  if ((time(&now) % 30) == 0)
   {
     xSemaphoreTake(mutex, portMAX_DELAY);
     Serial.print("Temperatura ");
