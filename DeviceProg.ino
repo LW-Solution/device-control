@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "time.h"
+#include <string.h>
 
 String uid;
 String json;
@@ -18,6 +19,8 @@ struct tm timeinfo;
 
 TaskHandle_t task1;
 TaskHandle_t task2;
+TaskHandle_t task3;
+TaskHandle_t task4;
 
 SemaphoreHandle_t mutex;
 
@@ -25,63 +28,89 @@ typedef struct __attribute__((packed)){
   int16_t temperatura;
   int16_t umidade;
   int16_t vel_vento;
-  int16_t dir_vento;
   String station_description;
 } payload_t;
 
 payload_t pay;
 
+char* removerBarrasInvertidas(const char* str) {
+  int len = strlen(str);
+  char* result = (char*)malloc(len + 1);
+  if (result == NULL) {
+    return NULL;
+  }
+
+  const char* src = str;
+  char* dst = result;
+
+  while (*src) {
+    if (*src == '\\') {
+      src++;
+    }
+    *dst++ = *src++;
+  }
+  *dst = '\0';
+
+  return result;
+}
+
+
 
 void minhaTask1(void *pvParameters)
 {
-  Serial.println("Comecou a Task1");
+  Serial.println("Comecou a Task1 - gera parametro de temperatura");
   while(true){
     //regiao crítica
     xSemaphoreTake(mutex, portMAX_DELAY);
   
-  
     pay.temperatura = random(20, 35);
-    pay.umidade = random(10, 90);
-    pay.vel_vento = random(0, 100);
-    pay.dir_vento = random(0, 359);
-    pay.station_description = "Sao Jose dos Campos";
-
-    json = "{\"uuid\":" + uid + ",\"station_description\":" + String(pay.station_description)
-    + ",\"unix\":" + String(time(&now))
-    + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
-    + ",\"Umidade\":" + String(pay.umidade)
-    + ",\"Vento\":" + String(pay.vel_vento)
-    + "}}";
 
     xSemaphoreGive(mutex);
-    delay(1300);
+    delay(900);
   }
 }
 
 void minhaTask2(void *pvParameters)
 {
-  Serial.println("Comecou a Task2");
+  Serial.println("Comecou a Task2 - gera parametro de umidade");
   while(true){
     xSemaphoreTake(mutex, portMAX_DELAY);
     
-  
-    pay.temperatura = random(20, 35);
     pay.umidade = random(10, 90);
-    pay.vel_vento = random(0, 100);
-    pay.dir_vento = random(0, 359);
-    pay.station_description = "Sao Jose dos Campos";
-
-    json = "{\"uuid\":" + uid + ",\"station_description\":" + String(pay.station_description)
-    + ",\"unix\":" + String(time(&now))
-    + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
-    + ",\"Umidade\":" + String(pay.umidade)
-    + ",\"Vento\":" + String(pay.vel_vento)
-    + "}}";
 
     xSemaphoreGive(mutex);
     delay(800);
   }
 }
+
+void minhaTask3(void *pvParameters)
+{
+  Serial.println("Comecou a Task3 - gera parametro de vel_vento");
+  while(true){
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    
+    pay.vel_vento = random(0, 100);
+
+    xSemaphoreGive(mutex);
+    delay(1000);
+  }
+}
+
+void minhaTask4(void *pvParameters)
+{
+  Serial.println("Comecou a Task4 - atribui o parametro station_description");
+  while(true){
+    //regiao crítica
+    xSemaphoreTake(mutex, portMAX_DELAY);
+  
+    pay.station_description = "Sao Jose dos Campos";
+
+    xSemaphoreGive(mutex);
+    delay(700);
+  }
+}
+
+
 
 WiFiClient wclient;
 PubSubClient mqttClient(wclient);
@@ -150,6 +179,28 @@ void setup() {
     1 //core (loop = 1)
     );
 
+  Serial.println("Criando a task 3");
+  xTaskCreatePinnedToCore(
+    minhaTask3, //funcao da task
+    "MinhaTask3", //nome da task
+    1000, //tamanho da task
+    NULL, //parametros task
+    1, //prioridade da task
+    &task3, //task handle
+    0 //core (loop = 1)
+    );
+
+  Serial.println("Criando a task 4");
+  xTaskCreatePinnedToCore(
+    minhaTask4, //funcao da task
+    "MinhaTask4", //nome da task
+    1000, //tamanho da task
+    NULL, //parametros task
+    1, //prioridade da task
+    &task4, //task handle
+    1 //core (loop = 1)
+    );
+
   if (!getLocalTime(&timeinfo))
   {
     Serial.println("Erro ao acessar o servidor NTP"); 
@@ -183,6 +234,23 @@ void loop() {
     connectMqtt();  
   }
 
+    json = "{\"uuid\":" + uid + ",\"station_description\":" + String(pay.station_description)
+    + ",\"unix\":" + String(time(&now))
+    + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
+    + ",\"Umidade\":" + String(pay.umidade)
+    + ",\"Vento\":" + String(pay.vel_vento)
+    + "}}";
+
+
+    /*
+    json = "{'uuid':" + uid + ",'station_description':" + String(pay.station_description)
+    + ",'unix':" + String(time(&now))
+    + ",'parametros':{'Temperatura':" + String(pay.temperatura)
+    + ",'Umidade':" + String(pay.umidade)
+    + ",'Vento':" + String(pay.vel_vento)
+    + "}}";
+    */
+    
   
   if ((time(&now) % 60) == 0)
   {
@@ -193,8 +261,8 @@ void loop() {
     Serial.println(pay.umidade);
     Serial.print("Velocidade do vento ");
     Serial.println(pay.vel_vento);
-    Serial.print("Direcao do vento ");
-    Serial.println(pay.dir_vento);
+    Serial.print("Descricao da estacao ");
+    Serial.println(pay.station_description);
     xSemaphoreGive(mutex);
     
 
@@ -203,8 +271,8 @@ void loop() {
     sincronizaTempo();
     Serial.println("Enviar dados pelo MQTT");
     Serial.println(json);
-    Serial.println(json.c_str());
-    mqttClient.publish("fatec/lw/dados/", json.c_str());
+    Serial.println(removerBarrasInvertidas(json.c_str()));
+    mqttClient.publish("fatec/lw/dados/", removerBarrasInvertidas(json.c_str()));
     delay(1000);
   }
  
