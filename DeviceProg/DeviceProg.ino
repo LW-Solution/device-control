@@ -2,12 +2,17 @@
 #include <PubSubClient.h>
 #include "time.h"
 #include <string.h>
-
+#include "Grove_Temperature_And_Humidity_Sensor.h"
+#define DHTTYPE DHT11 
+#define LUMINOSIDADEPIN 4
+#define DHTPIN 14 
+DHT dht(DHTPIN, DHTTYPE);
 String uid;
 String json;
 
-char *ssid = "redeplaca";
-char *pwd = "senhaplaca";
+
+char *ssid = "Motumbo 30m";
+char *pwd = "vanisilvia79";
 
 char *mqttServer = "test.mosquitto.org";
 
@@ -27,7 +32,7 @@ SemaphoreHandle_t mutex;
 typedef struct __attribute__((packed)){
   int16_t temperatura;
   int16_t umidade;
-  int16_t vel_vento;
+  int16_t luminosidade;
   String station_description;
 } payload_t;
 
@@ -62,9 +67,12 @@ void minhaTask1(void *pvParameters)
   while(true){
     //regiao crítica
     xSemaphoreTake(mutex, portMAX_DELAY);
-  
-    pay.temperatura = random(20, 35);
+    
+    float temp_hum_val[2] = {0};
 
+    if (!dht.readTempAndHumidity(temp_hum_val)) {
+        pay.temperatura = temp_hum_val[1]; 
+    } 
     xSemaphoreGive(mutex);
     delay(900);
   }
@@ -76,7 +84,12 @@ void minhaTask2(void *pvParameters)
   while(true){
     xSemaphoreTake(mutex, portMAX_DELAY);
     
-    pay.umidade = random(10, 90);
+
+  float temp_hum_val[2] = {0};
+
+  if (!dht.readTempAndHumidity(temp_hum_val)) {
+        pay.umidade = temp_hum_val[0]; 
+  } 
 
     xSemaphoreGive(mutex);
     delay(800);
@@ -86,10 +99,24 @@ void minhaTask2(void *pvParameters)
 void minhaTask3(void *pvParameters)
 {
   Serial.println("Comecou a Task3 - gera parametro de vel_vento");
+
+  float volts, amps, microamps, lux;
+
+
   while(true){
     xSemaphoreTake(mutex, portMAX_DELAY);
+    analogReadResolution(10);
+
+    volts = analogRead(LUMINOSIDADEPIN) * 5 / 1024.0;
+    Serial.print("Volts ");
+    Serial.println(volts);
+    amps = volts / 10000.0;
+    microamps = amps * 1000000;
+    lux = microamps * 2.0;
+    pay.luminosidade = lux;
     
-    pay.vel_vento = random(0, 100);
+    Serial.print("Lux ");
+    Serial.println(lux);
 
     xSemaphoreGive(mutex);
     delay(1000);
@@ -153,6 +180,8 @@ void setup() {
   configTime(gmtOffset, daylight, ntpServer);
 
   mutex = xSemaphoreCreateMutex();
+  pinMode(LUMINOSIDADEPIN, INPUT);
+  dht.begin();
 
   if (mutex == NULL)
     Serial.println("Erro ao criar o mutex");
@@ -234,12 +263,21 @@ void loop() {
     connectMqtt();  
   }
   
+     analogReadResolution(10);
+
+    float volts = analogRead(LUMINOSIDADEPIN) * 5 / 1024.0;
+    Serial.print("Volts ");
+    Serial.println(volts);
+    float amps = volts / 10000.0;
+    float microamps = amps * 1000000;
+    float lux = microamps * 2.0;
+    pay.luminosidade = lux;
 
     json = "{\"uuid\":\"" + uid
     + "\",\"unix\":" + String(time(&now))
     + ",\"parametros\":{\"Temperatura\":" + String(pay.temperatura)
     + ",\"Umidade\":" + String(pay.umidade)
-    + ",\"Vento\":" + String(pay.vel_vento)
+    + ",\"Luminosidade\":" + String(pay.luminosidade)
     + "}}";
   
 
@@ -261,8 +299,8 @@ void loop() {
     Serial.println(pay.temperatura);
     Serial.print("Umidade ");
     Serial.println(pay.umidade);
-    Serial.print("Velocidade do vento ");
-    Serial.println(pay.vel_vento);
+    Serial.print("Luminosidade ");
+    Serial.println(pay.luminosidade);
     Serial.print("Descricao da estacao ");
     Serial.println(pay.station_description);
     xSemaphoreGive(mutex);
